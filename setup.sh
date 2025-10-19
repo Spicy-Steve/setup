@@ -2,6 +2,14 @@
 set -e  # Stop on any error
 set -u  # Treat unset vars as errors
 
+# === Prevent accidentally running ===
+read -p "Are you sure you want to start the setup? [Y/n]" {confim,,}
+if [ $confirm = "y" ] || [ $confirm = "yes" ] || [ -z $confirm ]; then
+    echo "Starting system setup & configuration..."
+else
+    echo "Setup aborted!"
+fi
+
 # === CONFIG ===
 GITHUB_USER="Spicy-Steve"
 DOTFILES_REPO="dotfiles"
