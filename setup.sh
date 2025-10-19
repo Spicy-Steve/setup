@@ -180,6 +180,14 @@ if [ -d "$DOTFILES_DIR/fonts" ]; then
     fc-cache -fv
 fi
 
+# === Icons ===
+if [ -d "$DOTFILES_DIR/icons" ]; then
+    echo "Installing custom icons..."
+    mkdir -p ~/.local/share/fonts/
+    cp -rf "$DOTFILES_DIR/icons/"* ~/.local/share/icons/
+    fc-cache -fv
+fi
+
 # === Config ===
 if [ -d "$DOTFILES_DIR/kde-config" ]; then
     echo "Copying config files..."
