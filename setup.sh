@@ -43,6 +43,24 @@ fi
 echo "Installing dependencies..."
 $PKG_INSTALL git zsh curl wget cowsay
 
+# === Install yay (AUR helper, Arch only) ===
+if [ -f /etc/arch-release ]; then
+    if ! command -v yay &>/dev/null; then
+        echo "Installing yay (AUR helper)..."
+        sudo pacman -S --needed --noconfirm base-devel git
+        tmpdir=$(mktemp -d)
+        git clone https://aur.archlinux.org/yay.git "$tmpdir"
+        cd "$tmpdir"
+        makepkg -si --noconfirm
+        cd -
+        rm -rf "$tmpdir"
+    else
+        echo "yay is already installed."
+    fi
+else
+    echo "Skipping yay install - not an Arch system."
+fi
+
 # === Install GPU Drivers (ARCH ONLY) ===
 if [ -f /etc/arch-release ]; then    
     echo "What is the GPU Vendor? (amd/nvidia/intel)"
@@ -53,6 +71,12 @@ if [ -f /etc/arch-release ]; then
         $PKG_INSTALL mesa lib32-mesa vulkan-intel lib32-vulkan-intel xf86-video-intel
     elif [ $gpu = "nvidia" ]; then
         $PKG_INSTALL nvidia nvidia-dkms nvidia-utils lib32-nvidia-utils
+        read -p "Install CUDA? [Y/n]" cudaq
+        if [ ${cudaq,,} = "y" ] || [ ${cudaq,,} = "yes" ] || [ $cudaq = "" ]; then
+            $PKG_INSTALL cuda
+        else
+            echo "Skipping CUDA installation..."
+        fi
     else
         echo "Invalid GPU Vendor, skipping..."
     fi
@@ -108,7 +132,7 @@ if [ -d "$DOTFILES_DIR/cursors" ]; then
     if command -v gsettings &>/dev/null; then
         gsettings set org.gnome.desktop.interface cursor-theme "$CURSOR_NAME"
     elif command -v plasma-apply-cursortheme &>/dev/null; then
-        plasma-apply-cursortheme "$CURSOR_NAME"
+        plasma-apply-cursortheme Bibata-6bcde
     else
         echo "Could not automatically apply cursor — please select it manually in system settings."
     fi
@@ -119,20 +143,23 @@ fi
 # === Install Papirus Icon Theme ===
 echo "Installing Papirus icons..."
 $PKG_INSTALL papirus-icon-theme
+echo "Applying folder colours..."
+wget -qO- https://git.io/papirus-folders-install | sh
+papirus-folders -C carmine --theme Papirus-Dark
 
 # Icon theme
 lookandfeeltool --apply org.kde.breeze.desktop || true
-kwriteconfig5 --file kdeglobals --group Icons --key Theme "$ICON_THEME"
+kwriteconfig6 --file kdeglobals --group Icons --key Theme "$ICON_THEME"
 
 # Color scheme
-kwriteconfig5 --file kdeglobals --group General --key AccentColor "$ACCENT_COLOR"
+kwriteconfig6 --file kdeglobals --group General --key AccentColor "$ACCENT_COLOR"
 plasma-apply-colorscheme BreezeDark
 
 # Wallpaper
 if [ -d "$WALLPAPER_PATH" ]; then
     echo "Copying wallpapers..."
-    mkdir -p ~/Pictures/wallpapers/
-    cp -r "$WALLPAPER_PATH"/* ~/Pictures/wallpapers/
+    mkdir -p ~/Pictures/Backgrounds/
+    cp -r "$WALLPAPER_PATH"/* ~/Pictures/Backgrounds/
 fi
 
 # === Fonts ===
@@ -143,9 +170,9 @@ if [ -d "$DOTFILES_DIR/fonts" ]; then
     fc-cache -fv
 fi
 
-# === KWin & Global KDE Config ===
+# === Config ===
 if [ -d "$DOTFILES_DIR/kde-config" ]; then
-    echo "Applying KDE window manager and Plasma configs..."
+    echo "Copying config files..."
     cp -r "$DOTFILES_DIR/kde-config/"* ~/.config/
 fi
 
@@ -159,7 +186,7 @@ fi
 # Restart Plasma shell to apply changes (optional)
 if pgrep plasmashell &>/dev/null; then
     echo "Restarting Plasma shell..."
-    kquitapp5 plasmashell && kstart5 plasmashell &
+    pkill plasmashell && kstart5 plasmashell &
 fi
 
 # === Change default shell to zsh ===
@@ -168,5 +195,45 @@ if [ "$SHELL" != "$(which zsh)" ]; then
     chsh -s "$(which zsh)"
 fi
 
+# === Package Installation ===
+read -p "Would you like to install packages? [Y/n]" appsq
+if [ ${appsq,,} = "y" ] || [ ${appsq,,} = "yes" ] || [ $appsq = "" ]; then
+    if [ -f /etc/fedora-release ]; then
+        $PKG_INSTALL android-tools ark btop cava cmatrix discord easyeffects ffmpeg-full fastfetch flatpak goverlay mangohud pavucontrol prismlauncher python python-websockets qbittorrent qt6-qtwebsockets-devel rar speedtest-cli steam vlc vlc-plugins-all
+    elif [ -f /etc/arch-release ]; then
+        $PKG_INSTALL android-tools ark btop cava cmatrix discord easyeffects ffmpeg fastfetch flatpak goverlay mangohud partitionmanager pavucontrol prismlauncher python python-websockets qbittorrent qt6-websockets rar speedtest-cli steam vlc vlc-plugins-all
+    elif [ -f /etc/debian_version ]; then
+        $PKG_INSTALL ark btop cava cmatrix discord easyeffects fastfetch flatpak google-android-platform-tools-installer goverlay mangohud pavucontrol prismlauncher python python-websockets qbittorrent qt6-websockets rar speedtest-cli steam vlc vlc-plugins-all
+else
+    echo "Skipping package installation..."
+fi
+
+# === Flatpak Installation ===
+read -p "Would you like to install flatpak && flatpak apps? [Y/n]" flatpakq
+if [ ${flatpakq,,} = "y" ] || [ ${flatpakq,,} = "yes" ] || [ $flatpakq = "" ]; then
+    flatpak install com.dec05eba.gpu_screen_recorder com.github.Matoking.protontricks com.github.tchx84.Flatseal com.steamgriddb.SGDBoop com.vysp3r.ProtonPlus io.missioncenter.MissionCenter it.mijorus.gearlever org.localsend.localsend_app
+else
+    echo "Skipping flatpak installation..."
+fi
+
+# === Package Installation (AUR) ===
+read -p "Would you like to install AUR packages? [Y/n]" aur_appsq
+if [ ${aur_appsq,,} = "y" ] || [ ${aur_appsq,,} = "yes" ] || [ $aur_appsq = "" ]; then
+    yay visual-studio-code-bin coolercontrol coolercontrold plasma6-applets-kurve
+else
+    echo "Skipping AUR package installation..."
+fi
+
+# === Copy Pacman config (Arch only) ===
+if [ -f /etc/arch-release ]; then
+    if [ -f "$DOTFILES_DIR/pacman.conf" ]; then
+        echo "Applying custom pacman configuration..."
+        sudo cp -f "$DOTFILES_DIR/pacman.conf" /etc/pacman.conf
+    else
+        echo "No pacman.conf found in dotfiles, skipping..."
+    fi
+fi
+
+fastfetch
 echo "=== Setup complete! ==="
-echo "Restart your terminal or log out/in for changes to apply."
+echo "Log out/in for changes to apply."
